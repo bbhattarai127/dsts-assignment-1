@@ -16,11 +16,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, confusion_matrix, accuracy_score
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-import seaborn as sns
+# import seaborn as sns
 from sklearn.impute import SimpleImputer
 import warnings
 
@@ -279,8 +279,8 @@ zomato_df['rating_class'].value_counts()
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, accuracy_score
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 import numpy as np
 
 # Binning the continuous target values into 2 categories (e.g., Low and High)
