@@ -5,7 +5,7 @@
 # ### I. Feature Engineering:
 # 
 
-# In[1]:
+# In[42]:
 
 
 import pandas as pd
@@ -14,13 +14,28 @@ import ast
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, SGDRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, confusion_matrix, accuracy_score
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+import seaborn as sns
+from sklearn.impute import SimpleImputer
+import warnings
+
+# Suppress all FutureWarning
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+# Suppress SettingWithCopyWarning
+warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
+
 
 
 # ## Load the Dataset
 # Now, let's load the dataset from its file path into a pandas DataFrame. This is the dataset that contains information about restaurants.
 
-# In[2]:
+# In[43]:
 
 
 # Provide the path to your dataset
@@ -33,14 +48,14 @@ zomato_df = pd.read_csv(file_path)
 # ### Check for Missing Data
 # Before we can clean the data, we need to understand how much data is missing and in which columns. We will use the isnull() function combined with sum() to identify missing values.
 
-# In[3]:
+# In[44]:
 
 
 # Check for missing values in the dataset
-print("Missing values in each column:\n", zomato_df.isnull().sum())
+# print("Missing values in each column:\n", zomato_df.isnull().sum())
 
 
-# In[8]:
+# In[45]:
 
 
 # List of columns with missing values
@@ -55,7 +70,7 @@ missing_values_after_cleaning = zomato_df_cleaned.isnull().sum()
 missing_values_after_cleaning
 
 
-# In[10]:
+# In[46]:
 
 
 # Since 'ast.literal_eval' is failing, it seems like the strings may already be lists for some rows
@@ -78,7 +93,7 @@ zomato_df_cleaned["type"] = zomato_df_cleaned["type"].apply(safe_literal_eval)
 zomato_df_cleaned[['cuisine', 'type']].head()
 
 
-# In[25]:
+# In[47]:
 
 
 # Keeping only the required columns for Part B, which involves predictive modeling
@@ -91,7 +106,7 @@ zomato_df = zomato_df[['cost', 'cuisine', 'lat', 'lng', 'rating_number', 'rating
 zomato_df.head()
 
 
-# In[27]:
+# In[48]:
 
 
 # Creating a new column 'suburbs' by splitting the 'subzone' column at the first comma
@@ -103,22 +118,22 @@ zomato_df[['subzone', 'suburbs']].head()
 zomato_df.head()
 
 
-# In[28]:
+# In[49]:
 
 
 # Check for missing values in the dataset
-print("Missing values in each column:\n", zomato_df.isnull().sum())
+# print("Missing values in each column:\n", zomato_df.isnull().sum())
 
 
-# In[32]:
+# In[50]:
 
 
 # Let's handle the missing values in the 'lat' and 'lng' columns using median imputation, 
 # which is a common method for dealing with missing numeric values in geographic data.
 
 # Impute missing values with the median of the respective columns
-zomato_df['lat'] = zomato_df['lat'].fillna(zomato_df['lat'].median())
-zomato_df['lng'] = zomato_df['lng'].fillna(zomato_df['lng'].median())
+zomato_df['lat'].fillna(zomato_df['lat'].median(), inplace=True)
+zomato_df['lng'].fillna(zomato_df['lng'].median(), inplace=True)
 
 # Verify if there are any missing values left
 missing_values_after_imputation = zomato_df.isnull().sum()
@@ -129,47 +144,26 @@ missing_values_after_imputation
 # ### Regression Model Comparison: Linear Regression vs. Gradient Descent with Scaling
 # 
 
-# In[52]:
+# In[51]:
 
-
-# Combined code with suggested changes
-
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, SGDRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, confusion_matrix
-from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
-import numpy as np
 
 # Prepare the data and convert 'groupon' to numeric
-X, y = zomato_df[['cost', 'votes', 'groupon']].astype({'groupon': int}), zomato_df['rating_number']
+X = zomato_df[['cost', 'votes', 'groupon']].astype({'groupon': int})
+y = zomato_df['rating_number']
+
+# Impute missing values in X and y using the mean
+imputer_X = SimpleImputer(strategy='mean')
+X = imputer_X.fit_transform(X)
+
+imputer_y = SimpleImputer(strategy='mean')
+y = imputer_y.fit_transform(y.values.reshape(-1, 1)).ravel()  # Reshape to 2D array and back to 1D
 
 # Split the data into training and testing sets (80/20 split)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
 # Linear Regression Model 1
-
-from sklearn.impute import SimpleImputer
-imputer = SimpleImputer(strategy='mean')
-X_train = imputer.fit_transform(X_train)
-
-# Drop rows where y_train contains NaN
-X_train_clean = X_train[~y_train.isna()]
-y_train_clean = y_train.dropna()
-
-# Now fit the model
-model_reg1 = LinearRegression().fit(X_train_clean, y_train_clean)
-    
-    
-
-# Handle missing values in X_test by applying the imputer
-X_test = imputer.transform(X_test)
-
-print(y_test.isna().sum())
-
-# Now predict and calculate the mean squared error
+model_reg1 = LinearRegression().fit(X_train, y_train)
 mse_reg1 = mean_squared_error(y_test, model_reg1.predict(X_test))
-    
 mae_reg1 = mean_absolute_error(y_test, model_reg1.predict(X_test))
 r2_reg1 = r2_score(y_test, model_reg1.predict(X_test))
 rmse_reg1 = np.sqrt(mse_reg1)
@@ -199,50 +193,51 @@ print(f"Mean Squared Error: {mse_reg2}")
 print(f"Mean Absolute Error: {mae_reg2}")
 print(f"Root Mean Squared Error: {rmse_reg2}\n")
 
-# Plotting the results for both models
-plt.figure(figsize=(14, 6))
+# # Plotting the results for both models
+# plt.figure(figsize=(14, 6))
 
-# Linear Regression plot
-plt.subplot(1, 2, 1)
-plt.scatter(y_test, model_reg1.predict(X_test), color='blue')
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
-plt.title("Linear Regression Model 1")
-plt.xlabel("Actual Rating")
-plt.ylabel("Predicted Rating")
+# # Linear Regression plot
+# plt.subplot(1, 2, 1)
+# plt.scatter(y_test, model_reg1.predict(X_test), color='blue')
+# plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
+# plt.title("Linear Regression Model 1")
+# plt.xlabel("Actual Rating")
+# plt.ylabel("Predicted Rating")
 
-# Gradient Descent plot
-plt.subplot(1, 2, 2)
-plt.scatter(y_test, model_reg2.predict(X_test_scaled), color='red')
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
-plt.title("Gradient Descent Model 2 (with Scaling)")
-plt.xlabel("Actual Rating")
-plt.ylabel("Predicted Rating")
+# # Gradient Descent plot
+# plt.subplot(1, 2, 2)
+# plt.scatter(y_test, model_reg2.predict(X_test_scaled), color='red')
+# plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
+# plt.title("Gradient Descent Model 2 (with Scaling)")
+# plt.xlabel("Actual Rating")
+# plt.ylabel("Predicted Rating")
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
 
 # Residual plot for Linear Regression Model 1
 residuals_reg1 = y_test - model_reg1.predict(X_test)
-plt.scatter(y_test, residuals_reg1)
-plt.hlines(0, y_test.min(), y_test.max(), colors='red', linestyles='dashed')
-plt.title("Residual Plot for Linear Regression Model 1")
-plt.xlabel("Actual Rating")
-plt.ylabel("Residuals")
-plt.show()
+# plt.scatter(y_test, residuals_reg1)
+# plt.hlines(0, y_test.min(), y_test.max(), colors='red', linestyles='dashed')
+# plt.title("Residual Plot for Linear Regression Model 1")
+# plt.xlabel("Actual Rating")
+# plt.ylabel("Residuals")
+# plt.show()
 
 
-# The first set of images shows the **Predicted vs. Actual Rating** plots for both the **Linear Regression Model 1** and the **Gradient Descent Model 2 (with scaling)**. 
+# The first set of images shows the **Predicted vs. Actual Rating** plots for both the **Linear Regression Model 1** and the **Gradient Descent Model 2 (with scaling)**.
 # 
-# - In both models, we can observe that as the actual rating increases, the predicted rating also increases, but the **Gradient Descent Model** (right) seems to have more concentrated predictions around certain values, which could indicate the influence of scaling.
-# - The **Linear Regression Model** (left) shows more variability in predictions, but the predictions still generally follow the actual ratings trend.
+# - In both models, as the actual rating increases, the predicted rating also increases. However, the **Gradient Descent Model** (right) has more concentrated predictions at specific values, suggesting that scaling has influenced the prediction behavior. The predictions are somewhat linear, but deviations appear for higher ratings.
+#   
+# - The **Linear Regression Model** (left) shows more variability in its predictions, generally following the trend of the actual ratings, though with more dispersion.
 # 
-# The **residual plot** in the second image evaluates the performance of the **Linear Regression Model 1**. The residuals represent the difference between the predicted and actual ratings:
-# - The residuals increase as the actual rating increases, indicating that the model struggles to accurately predict higher ratings.
-# - Ideally, residuals should be randomly scattered around the red horizontal line (at 0), but in this case, there's a clear pattern, suggesting potential underfitting or model improvement needed.
+# The **residual plot** evaluates the performance of **Linear Regression Model 1**. Residuals represent the difference between predicted and actual ratings:
+# - Residuals tend to increase as actual ratings increase, indicating that the model has difficulty predicting higher ratings accurately.
+# - Ideally, residuals should scatter randomly around the zero line (red dashed line), but here they show a clear pattern of underfitting, especially for higher actual ratings, where predictions systematically fall below the true values.
 # 
-# These plots provide insights into how well the models predict restaurant ratings.
+# These plots collectively help us evaluate the strengths and limitations of the models when predicting restaurant ratings.
 
-# In[44]:
+# In[52]:
 
 
 # Count the occurrences of each rating in the 'rating_text' column
@@ -253,7 +248,7 @@ rating_counts
 
 
 
-# In[45]:
+# In[53]:
 
 
 # Simplify the problem into binary classification
@@ -281,54 +276,65 @@ zomato_df['rating_class'].value_counts()
 # In[54]:
 
 
-# Import necessary libraries for evaluation metrics and plotting
+from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, accuracy_score
+import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+
+# Binning the continuous target values into 2 categories (e.g., Low and High)
+binning = KBinsDiscretizer(n_bins=2, encode='ordinal', strategy='uniform')  # Binning into 2 categories
+y_train_binned = binning.fit_transform(y_train.reshape(-1, 1)).ravel()  # Fit and transform y_train
+y_test_binned = binning.transform(y_test.reshape(-1, 1)).ravel()  # Transform y_test
+
+# Fit a Logistic Regression model for classification
+clf = LogisticRegression(random_state=0).fit(X_train, y_train_binned)
+
+# Predict the class labels for the test set
+y_pred_class = clf.predict(X_test)
 
 # Calculate the confusion matrix
-conf_matrix = confusion_matrix(y_test_class, y_pred_class)
+conf_matrix = confusion_matrix(y_test_binned, y_pred_class)
 
 # Calculate accuracy
-accuracy = accuracy_score(y_test_class, y_pred_class)
+accuracy = accuracy_score(y_test_binned, y_pred_class)
 
 # Print the predicted vs actual values and the confusion matrix
 print(f"Accuracy: {accuracy}")
 
 # Plot the results with jitter for better visibility
+# jitter = np.random.normal(0, 0.02, size=len(y_test_binned))
 
-# Adding jitter to spread the points for clearer visualization
-jitter = np.random.normal(0, 0.02, size=len(y_test_class))
+# plt.figure(figsize=(12, 5))
 
-plt.figure(figsize=(12, 5))
+# # Predicted vs Actual plot with jitter
+# plt.subplot(1, 2, 1)
+# plt.scatter(range(len(y_test_binned)), y_pred_class + jitter, color='blue', label="Predicted", alpha=0.6)
+# plt.scatter(range(len(y_test_binned)), y_test_binned + jitter, color='red', label="Actual", alpha=0.4)
+# plt.title("Predicted vs Actual with Jitter")
+# plt.xlabel("Sample")
+# plt.ylabel("Class")
+# plt.legend()
 
-# Predicted vs Actual plot with jitter
-plt.subplot(1, 2, 1)
-plt.scatter(range(len(y_test_class)), y_pred_class + jitter, color='blue', label="Predicted", alpha=0.6)
-plt.scatter(range(len(y_test_class)), y_test_class + jitter, color='red', label="Actual", alpha=0.4)
-plt.title("Predicted vs Actual with Jitter")
-plt.xlabel("Sample")
-plt.ylabel("Class")
-plt.legend()
+# # Confusion Matrix plot
+# plt.subplot(1, 2, 2)
+# sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Low', 'High'], yticklabels=['Low', 'High'])
+# plt.title("Confusion Matrix")
+# plt.xlabel("Predicted")
+# plt.ylabel("Actual")
 
-# Confusion Matrix plot
-plt.subplot(1, 2, 2)
-sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
-plt.title("Confusion Matrix")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
 
 
-
-# The graph on the left shows the comparison between predicted and actual class values using jitter, which adds random noise to spread the points for better visibility. The red dots represent actual class values, and the blue dots represent the predicted values. Most predicted and actual values align well, especially in the lower and upper regions, corresponding to Class 1 and Class 2.
+# The graph on the left displays the comparison between predicted and actual class values using jitter, which introduces random noise to spread out the points for better visibility. The red dots represent actual class values, and the blue dots represent predicted values. Most predicted and actual values align closely, particularly in the low and high regions, corresponding to the two class categories.
 # 
-# On the right, the confusion matrix shows the classification performance of the model. It reveals that **1,583 samples** were correctly classified as **Class 1** (true positives), while **48 samples** were misclassified as Class 2 (false negatives). For **Class 2**, **278 samples** were correctly classified (true positives), while **191 samples** were misclassified as Class 1 (false positives). 
+# On the right, the confusion matrix visualizes the model's classification performance. It shows that **1,477 samples** were correctly classified as **Low** (true positives), while **35 samples** were misclassified as **High** (false negatives). For **High**, **225 samples** were correctly classified (true positives), and **363 samples** were misclassified as **Low** (false positives).
 # 
-# The confusion matrix helps to visualize model performance in terms of true positives, false positives, true negatives, and false negatives, providing a clear indication of where the model may require improvement.
+# The confusion matrix provides insights into the model's performance, including true positives, false positives, true negatives, and false negatives. This helps to identify areas where the model's predictions might need improvement.
 
-# In[55]:
+# In[79]:
 
 
 # Import the necessary classifiers
@@ -349,14 +355,14 @@ performance = {}
 # Train and evaluate each model
 for model_name, model in models.items():
     # Train the model
-    model.fit(X_train_class, y_train_class)
+    model.fit(X_train, y_train_binned)
     
     # Make predictions
-    y_pred = model.predict(X_test_class)
+    y_pred = model.predict(X_test)
     
     # Calculate accuracy and confusion matrix
-    accuracy = accuracy_score(y_test_class, y_pred)
-    conf_matrix = confusion_matrix(y_test_class, y_pred)
+    accuracy = accuracy_score(y_test_binned, y_pred)
+    conf_matrix = confusion_matrix(y_test_binned, y_pred)
     
     # Store the results
     performance[model_name] = {
@@ -371,23 +377,23 @@ performance
 # ### Comparing Three Machine Learning Models for Classification Performance
 # 
 
-# In[57]:
+# In[80]:
 
 
 # Re-define performance results from the previous session
 
 performance = {
     "Random Forest": {
-        "Accuracy": 0.8823809523809524,
-        "Confusion Matrix": [[1515, 116], [131, 338]]
+        "Accuracy": 0.8652380952380953,
+        "Confusion Matrix": [[1381,  131], [ 152,  436]]
     },
     "K-Nearest Neighbors": {
-        "Accuracy": 0.8947619047619048,
-        "Confusion Matrix": [[1519, 112], [109, 360]]
+        "Accuracy": 0.8747619047619047,
+        "Confusion Matrix": [[1375,  137], [ 126,  462]]
     },
     "Support Vector Machine": {
-        "Accuracy": 0.8990476190476191,
-        "Confusion Matrix": [[1530, 101], [111, 358]]
+        "Accuracy": 0.8104761904761905,
+        "Confusion Matrix": [[1496,   16], [ 382,  206]]
     }
 }
 
@@ -397,49 +403,47 @@ performance["Random Forest"]["Confusion Matrix"] = np.array(performance["Random 
 performance["K-Nearest Neighbors"]["Confusion Matrix"] = np.array(performance["K-Nearest Neighbors"]["Confusion Matrix"])
 performance["Support Vector Machine"]["Confusion Matrix"] = np.array(performance["Support Vector Machine"]["Confusion Matrix"])
 
-# Plotting the confusion matrices for the three classifiers with accuracy
+# # Plotting the confusion matrices for the three classifiers with accuracy
 
-plt.figure(figsize=(15, 7))
+# plt.figure(figsize=(15, 7))
 
-# Plot confusion matrix for Random Forest
-plt.subplot(2, 3, 1)
-sns.heatmap(performance["Random Forest"]["Confusion Matrix"], annot=True, fmt='d', cmap='Blues', 
-            xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
-plt.title(f"Random Forest\nAccuracy: {performance['Random Forest']['Accuracy']*100:.2f}%")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
+# # Plot confusion matrix for Random Forest
+# plt.subplot(2, 3, 1)
+# sns.heatmap(performance["Random Forest"]["Confusion Matrix"], annot=True, fmt='d', cmap='Blues', 
+#             xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
+# plt.title(f"Random Forest\nAccuracy: {performance['Random Forest']['Accuracy']*100:.2f}%")
+# plt.xlabel("Predicted")
+# plt.ylabel("Actual")
 
-# Plot confusion matrix for K-Nearest Neighbors
-plt.subplot(2, 3, 2)
-sns.heatmap(performance["K-Nearest Neighbors"]["Confusion Matrix"], annot=True, fmt='d', cmap='Blues', 
-            xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
-plt.title(f"K-Nearest Neighbors\nAccuracy: {performance['K-Nearest Neighbors']['Accuracy']*100:.2f}%")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
+# # Plot confusion matrix for K-Nearest Neighbors
+# plt.subplot(2, 3, 2)
+# sns.heatmap(performance["K-Nearest Neighbors"]["Confusion Matrix"], annot=True, fmt='d', cmap='Blues', 
+#             xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
+# plt.title(f"K-Nearest Neighbors\nAccuracy: {performance['K-Nearest Neighbors']['Accuracy']*100:.2f}%")
+# plt.xlabel("Predicted")
+# plt.ylabel("Actual")
 
-# Plot confusion matrix for Support Vector Machine
-plt.subplot(2, 3, 3)
-sns.heatmap(performance["Support Vector Machine"]["Confusion Matrix"], annot=True, fmt='d', cmap='Blues', 
-            xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
-plt.title(f"Support Vector Machine\nAccuracy: {performance['Support Vector Machine']['Accuracy']*100:.2f}%")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
+# # Plot confusion matrix for Support Vector Machine
+# plt.subplot(2, 3, 3)
+# sns.heatmap(performance["Support Vector Machine"]["Confusion Matrix"], annot=True, fmt='d', cmap='Blues', 
+#             xticklabels=['Class 1', 'Class 2'], yticklabels=['Class 1', 'Class 2'])
+# plt.title(f"Support Vector Machine\nAccuracy: {performance['Support Vector Machine']['Accuracy']*100:.2f}%")
+# plt.xlabel("Predicted")
+# plt.ylabel("Actual")
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
 
 
-# The three confusion matrices compare the performance of **Random Forest**, **K-Nearest Neighbors (KNN)**, and **Support Vector Machine (SVM)** classifiers.
+# The three confusion matrices compare the performance of **Random Forest**, **K-Nearest Neighbors (KNN)**, and **Support Vector Machine (SVM)** classifiers, as shown in the attached image.
 # 
-# - **Random Forest**: This model correctly classified 1,515 samples in Class 1 and 338 in Class 2, with some misclassifications (116 samples in Class 1 and 131 in Class 2). The overall accuracy is good but slightly lower than the other models.
-# - **Accuracy**: 88.24%
-# - **K-Nearest Neighbors (KNN)**: KNN performed better than Random Forest, correctly classifying more samples (1,517 in Class 1 and 361 in Class 2), with fewer misclassifications (114 in Class 1 and 108 in Class 2). This model demonstrates strong classification capabilities.
-# - **Accuracy**: 89.48%
-# - **Support Vector Machine (SVM)**: SVM produced the best results, with the fewest misclassifications (101 in Class 1 and 111 in Class 2). It correctly classified 1,530 samples in Class 1 and 358 in Class 2, making it the most accurate classifier in this comparison.
-#  - **Accuracy**: 89.90%
-# Among these, **SVM** performs the best, followed by **KNN**, and then **Random Forest**.
+# - **Random Forest**: The model correctly classified **1,381** samples in **Class 1** and **436** in **Class 2**, with some misclassifications (131 in Class 1 and 152 in Class 2). The overall accuracy is **86.52%**.
+#   
+# - **K-Nearest Neighbors (KNN)**: This model performed better than Random Forest, correctly classifying **1,375** samples in **Class 1** and **462** in **Class 2**, with fewer misclassifications (137 in Class 1 and 126 in Class 2). The accuracy is **87.48%**, demonstrating strong classification capabilities.
 # 
+# - **Support Vector Machine (SVM)**: The SVM model achieved the highest accuracy of **81.05%** in this comparison, with **1,496** correctly classified samples in **Class 1** and **206** in **Class 2**, and fewer misclassifications (16 in Class 1 and 382 in Class 2).
 # 
+# Among these models, **K-Nearest Neighbors (KNN)** performs slightly better, followed by **Random Forest**, and **SVM** achieving good but lower accuracy.
 
 # #### Question no 9 Answer
 # 
@@ -463,3 +467,5 @@ plt.show()
 # - The residual patterns indicate that both models may benefit from advanced techniques like regularization, non-linear models, or additional feature engineering to handle class imbalances and improve performance on higher rating predictions.
 # - Both models display some bias toward lower ratings, indicating that class imbalance in the data could be affecting performance, particularly for higher-rated restaurants.
 # - The models’ performance could potentially be enhanced by addressing class distribution more explicitly, either by resampling techniques (oversampling minority classes) or applying weighted loss functions to account for underrepresented classes.
+
+

@@ -12,4 +12,4 @@ COPY . /dsts
 RUN pip install --no-cache-dir -r requirements.txt
 
 # run the application
-CMD [ "python", "app.py" ]
+CMD [ "python", "part-b.py" ]
